@@ -12,23 +12,23 @@ alerting:
             - 'alertmanager:9093'
 
 scrape_configs:
-  # 1. Prometheus self-auditing
+  # Prometheus self-auditing
   - job_name: 'prometheus'
     static_configs:
       - targets: ['127.0.0.1:9090']
 
-  # 2. Bare-Metal Server Node Metrics (Hits Host OS directly)
+  # Bare-Metal Server Node Metrics (Hits Host OS directly)
   - job_name: 'node'
     static_configs:
       - targets: ['host.containers.internal:9100']
 
-  # 3. Target Java Applications outside Podman
+  # Target Java Applications outside Podman
   - job_name: 'spring-boot-demo-app'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.containers.internal:8084']
 
-  # 4. Blackbox Active Endpoint Synthetics
+  # Blackbox Active Endpoint Synthetics
   - job_name: 'blackbox-http'
     metrics_path: /probe
     params:
@@ -45,5 +45,4 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        # force IPv4 loopback to prevent [::1} connection refused errors
         replacement: blackbox-exporter:9115        # Redirects payload traffic into the Pod's prober engine
