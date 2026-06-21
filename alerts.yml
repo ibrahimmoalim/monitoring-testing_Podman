@@ -1,0 +1,79 @@
+groups:
+  - name: node_exporter_alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} is down"
+          description: "The Node Exporter target has been offline for more than 1 minute."
+
+      - alert: HighCpuLoad
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 90
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU load on {{ $labels.instance }}"
+          description: "CPU usage is at {{ printf \"%.2f\" $value }}% for the last 5 minutes."
+
+      - alert: LowMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 < 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Memory on {{ $labels.instance }}"
+          description: "Available memory has dropped below 10% (Current: {{ printf \"%.2f\" $value }}%)."
+
+  - name: spring_boot_app_alerts
+    rules:
+      - alert: HikariPoolNearExhaustion
+        expr: hikaricp_connections_active{pool="WalletApp-HikariPool"} > 16
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP pool utilizing > 80% capacity"
+          description: "Active connections are at {{ $value }} out of a max pool size of 20."
+
+      - alert: HikariPoolPendingThreads
+        expr: hikaricp_connections_pending{pool="WalletApp-HikariPool"} > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Threads are waiting for database connections!"
+          description: "There are currently {{ $value }} threads blocked waiting to get a database connection."
+
+      - alert: HighHttpErrorRate
+        expr: rate(http_server_requests_seconds_count{status=~"5.*"}[1m]) > 1
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spike in Application Errors (5xx status codes)"
+          description: "The application is throwing internal server exceptions at a rate of {{ $value }} per second."
+
+  - name: blackbox_exporter_alerts
+    rules:
+      - alert: BlackboxProbeFailed
+        expr: probe_success == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Endpoint Down: {{ $labels.instance }}"
+          description: "The Blackbox prober failed to hit target endpoint {{ $labels.instance }} for more than 30 seconds."
+
+      - alert: SSLCertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 3600 / 24 < 7
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL Certificate Expiring Soon on {{ $labels.instance }}"
+          description: "The SSL certificate for {{ $labels.instance }} expires in {{ printf \"%.1f\" $value }} days."
+

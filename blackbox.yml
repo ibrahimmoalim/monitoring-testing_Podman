@@ -1,0 +1,14 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      # the empty array means, any status code in the 200–299 range
+      # is considered a pass. a 401 Unauthorized or 500 Server Error,
+      # fails the check. If we expect a specific status code, we could
+      # override this with values like [401, 302]
+      valid_status_codes: []  # Defaults to 2xx status codes
+      method: GET
+      # allows redirects like from http to https
+      follow_redirects: true
+
