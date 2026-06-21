@@ -8,7 +8,7 @@ groups:
           severity: critical
         annotations:
           summary: "Instance {{ $labels.instance }} is down"
-          description: "The Node Exporter target has been offline for more than 1 minute."
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute"
 
       - alert: HighCpuLoad
         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 90
@@ -76,4 +76,3 @@ groups:
         annotations:
           summary: "SSL Certificate Expiring Soon on {{ $labels.instance }}"
           description: "The SSL certificate for {{ $labels.instance }} expires in {{ printf \"%.1f\" $value }} days."
-
