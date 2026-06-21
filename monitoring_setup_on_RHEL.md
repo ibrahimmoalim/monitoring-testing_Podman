@@ -42,13 +42,15 @@ Save the following content as `compose.monitoring.yml`. All host volume definiti
 ```yaml
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: docker.io/prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:Z
-      - ./node_alerts.yml:/etc/prometheus/node_alerts.yml:Z
+      - ./alerts.yml:/etc/prometheus/node_alerts.yml:Z
       - prometheus_data:/prometheus:Z
+    ports:
+      - "127.0.0.1:9091:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -59,38 +61,46 @@ services:
       - '--storage.tsdb.max-block-duration=2h'
       - '--storage.tsdb.min-block-duration=2h'
       - '--storage.tsdb.retention.time=7d'
-    networks:                         
+    networks:
       - monitoring-testing
 
   grafana:
-    image: grafana/grafana:latest
+    image: docker.io/grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana:Z
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS}
-    networks:                         
+    networks:
       - monitoring-testing
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: docker.io/prom/alertmanager:latest
     container_name: alertmanager
     restart: unless-stopped
-    configs:
-      - source: alertmanager_config
-        target: /etc/alertmanager/alertmanager.yml
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:Z
+    environment:
+      - GMAIL=${GMAIL}
+      - GMAIL_PASS=${GMAIL_PASS}
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--web.external-url=http://localhost:9093'
-    networks:                         
+    networks:
       - monitoring-testing
 
   blackbox-exporter:
-    image: prom/blackbox-exporter:latest
+    image: docker.io/prom/blackbox-exporter:latest
     container_name: blackbox-exporter
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:9115:9115"
     volumes:
       - ./blackbox.yml:/etc/blackbox_exporter/config.yml:Z
     networks:
@@ -104,28 +114,6 @@ volumes:
   prometheus_data:
   grafana_data:
 
-configs:
-  alertmanager_config:
-    content: |
-      global:
-        resolve_timeout: 5m
-      route:
-        group_by: ['alertname', 'instance']
-        group_wait: 30s
-        group_interval: 5m
-        repeat_interval: 4h
-        receiver: 'gmail-notifications'
-      receivers:
-      - name: 'gmail-notifications'
-        email_configs:
-        - to: '${GMAIL}'
-          from: '${GMAIL}'
-          smarthost: 'smtp.gmail.com:587'
-          auth_username: '${GMAIL}'
-          auth_password: '${GMAIL_PASS}'
-          auth_identity: '${GMAIL}'
-          send_resolved: true
-
 ```
 
 ---
@@ -136,7 +124,7 @@ Save this configuration as `prometheus.yml`. Because your monitoring core is dep
 
 ```yaml
 global:
-  scrape_interval: 30s 
+  scrape_interval: 30s
   evaluation_interval: 30s
 
 rule_files:
@@ -146,43 +134,43 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets:
-            - 'localhost:9093'
+            - 'alertmanager:9093'
 
 scrape_configs:
-  # 1. Prometheus self-auditing
+  # Prometheus self-auditing
   - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['127.0.0.1:9090']
 
-  # 2. Bare-Metal Server Node Metrics (Hits Host OS directly)
+  # Bare-Metal Server Node Metrics (Hits Host OS directly)
   - job_name: 'node'
     static_configs:
-      - targets: ['172.18.0.1:9100'] 
+      - targets: ['host.containers.internal:9100']
 
-  # 3. Target Java Applications outside Podman
+  # Target Java Applications outside Podman
   - job_name: 'spring-boot-demo-app'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['172.18.0.1:8084']
+      - targets: ['host.containers.internal:8084']
 
-  # 4. Blackbox Active Endpoint Synthetics
+  # Blackbox Active Endpoint Synthetics
   - job_name: 'blackbox-http'
     metrics_path: /probe
     params:
       module: [http_2xx]
     static_configs:
       - targets:
-        - http://localhost:3000            # Probes Grafana locally inside the Pod
+        - http://grafana:3000            # Probes Grafana locally inside the Pod
         - https://ibrahimmoalim.dev        # External Production Target
         - https://api.ibrahimmoalim.dev    # External API Target
-        - http://172.18.0.1:8081/api/users   # Internal App Endpoint on Host
+        - http://host.containers.internal:8081/api/users   # Internal App Endpoint on Host
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: localhost:9115        # Redirects payload traffic into the Pod's prober engine
+        replacement: blackbox-exporter:9115        # Redirects payload traffic into the Pod's prober engine
 
 ```
 
@@ -203,7 +191,7 @@ groups:
           severity: critical
         annotations:
           summary: "Instance {{ $labels.instance }} is down"
-          description: "The Node Exporter target has been offline for more than 1 minute."
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute"
 
       - alert: HighCpuLoad
         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 90
@@ -300,11 +288,18 @@ podman-compose -f compose.monitoring.yml up -d
 
 ```
 
+### Make sure podman starts containers on boot
+```bash
+sudo systemctl enable podman-restart.service
+```
+```bash
+sudo systemctl start podman-restart.service
+```
+
 ### Hot-Reloading Reminder
 
 Whenever you tweak your alert properties inside `node_alerts.yml` or add a new HTTP url route to `prometheus.yml`, remember to execute a reload payload without stopping any application:
 
 ```bash
-curl -X POST http://localhost:9090/-/reload
-
+curl -X POST http://localhost:9091/-/reload
 ```
