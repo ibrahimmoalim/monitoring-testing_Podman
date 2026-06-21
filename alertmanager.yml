@@ -18,4 +18,3 @@ receivers:
     auth_password: '${GMAIL_PASS}'
     auth_identity: '${GMAIL}'
     send_resolved: true
-

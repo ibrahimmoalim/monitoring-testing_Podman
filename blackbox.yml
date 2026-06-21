@@ -11,4 +11,3 @@ modules:
       method: GET
       # allows redirects like from http to https
       follow_redirects: true
-
