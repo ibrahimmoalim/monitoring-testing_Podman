@@ -1,0 +1,40 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: "2024-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# DEFINE THE RETENTION LIMITS (DELETE LOGS EVERY 7 DAYS)
+limits_config:
+  retention_period: 168h # 7 days (7 * 24 hours)
+
+# ENABLE THE COMPACTOR TO DO THE CLEANING
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  # Tells Loki to actively delete logs older than the retention_period
+  retention_enabled: true
+  retention_delete_delay: 2h
+  delete_request_store: filesystem
