@@ -4,6 +4,11 @@ services:
     container_name: prometheus
     restart: unless-stopped
     volumes:
+      # By default, Red Hat-based systems (like RHEL, Fedora, CentOS, Rocky) use SELinux to block containers
+      # from reading arbitrary host files.
+      # :z (lowercase): Configures the directory to be shared among multiple containers.
+      # :Z (uppercase): Configures the directory to be private and exclusive to this specific container.
+      # Without :Z, your containers would immediately crash with Permission Denied errors when trying to read your configuration files (prometheus.yml, tempo-config.yml, etc.).
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:Z
       - ./alerts.yml:/etc/prometheus/node_alerts.yml:Z
       - prometheus_data:/prometheus:Z
@@ -33,6 +38,76 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS}
+    networks:
+      - monitoring-testing
+
+  # Loki: The central storage engine for all logs (The "database" for text logs)
+  loki:
+    image: docker.io/grafana/loki:3.0.0
+    container_name: loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:Z
+      - loki_data:/loki:Z
+    # Uses Loki's default internal configuration file
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    networks:
+      - monitoring-testing
+
+  # Promtail: The log collector that grabs container logs and pushes them to Loki
+  promtail:
+    image: docker.io/grafana/promtail:3.0.0
+    container_name: promtail
+    # Tells Podman to run the container as the promtail user(default)
+    # but additionally inherit the host's logging group ID(systemd-journal).
+    # you can find the systemd-journal GID with the command:
+    # 'getent group systemd-journal' or 'cat /etc/group | grep journal'
+    group_add:
+      - "999"
+    volumes:
+      # Mounts the custom configuration file created in this dir
+      - ./promtail-config.yml:/etc/promtail/config.yml:Z
+      # Let Promtail read directly from Journald as read-only (ro)
+      # The :ro flag ensures that even if Promtail were compromised, it cannot
+      # delete, alter, or inject fake logs back into your system; it can only read them.
+      - /var/log/journal:/var/log/journal:ro,Z
+      - /run/log/journal:/run/log/journal:ro,Z
+      # mount the java app logs so we can see app logs in grafana via loki
+      - /home/ibrahim/mobile_project_demo/backend_api/logs/wallet-app.log:/var/log/wallet-app.log:ro,Z
+    # Explicitly tells Promtail to read the custom configuration mount
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    depends_on:
+      # Ensures Loki starts up completely before Promtail tries to stream logs to it
+      - loki
+    networks:
+      - monitoring-testing
+
+  # Tempo: The storage backend for distributed tracing (Maps user request pathways)
+  tempo:
+    image: docker.io/grafana/tempo:2.4.1
+    container_name: tempo
+    volumes:
+      # Mounts the custom configuration file created in this dir
+      - ./tempo-config.yml:/etc/tempo.yaml:Z
+      # persistent storage
+      - tempo_data:/var/tempo:Z
+
+    # boot Tempo using the custom config
+    # the grafana/tempo image explicitly expects the cleaner Exec Form (Array)
+    # to ensure it never drops traces during a reboot.
+    command: [ "--config.file=/etc/tempo.yaml" ]
+    ports:
+      # the '127.0.0.1' Explicitly binds port 4318 to the host's localhost
+      # Tempo's web API port (Grafana uses this to fetch and display traces)
+      - "127.0.0.1:3200:3200"
+      # OTLP gRPC ingest (Your Spring Boot app can send traces here)
+      - "127.0.0.1:4317:4317"
+      # OTLP HTTP ingest port. Alternative endpoint for apps utilizing HTTP-based tracing.
+      - "127.0.0.1:4318:4318"
+    restart: unless-stopped
     networks:
       - monitoring-testing
 
@@ -71,3 +146,5 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  loki_data:
+  tempo_data:
