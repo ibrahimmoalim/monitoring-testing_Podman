@@ -1,0 +1,54 @@
+# This tells Promtail to grab the container logs and push them to Loki
+
+# Server block configures the internal web server for Promtail itself
+server:
+    # The port where Promtail exposes its own metrics and health check
+    http_listen_port: 9080
+    # 0 means randomly assign a gRPC port (not needed for basic setups)
+    grpc_listen_port: 0
+
+# Positions file keeps track of how much of each log file Promtail has read.
+# If Promtail restarts, it reads this file so it knows where to resume,
+# preventing it from sending duplicate logs to Loki.
+positions:
+    filename: /tmp/positions.yaml
+
+# Clients block defines where Promtail should push the collected logs
+clients:
+    # The internal Podman network URL to Loki's log ingest API
+    - url: http://loki:3100/loki/api/v1/push
+
+# Scrape configs tell Promtail where to look for logs and how to label them
+scrape_configs:
+    # A name to group this specific scraping task
+    - job_name: podman-journal
+
+      journal:
+          max_age: 12h
+          path: /var/log/journal
+          labels:
+              job: systemd-journal
+
+      # Relabel configs modify the metadata attached to the logs before sending them to Loki
+      relabel_configs:
+            # This block extracts the actual container name and assigns it to a clean label called 'container'
+            # The raw internal metadata string (e.g., "/prometheus")
+          - source_labels: ['__journal_CONTAINER_NAME']
+            # The clean label name you will query in Grafana (e.g., container="prometheus")
+            target_label: 'container'
+
+            # optional: this grabs the systemd service name
+            # (helpful for getting host logs too)
+          - source_labels: ['__journal__SYSTEMD_UNIT']
+            target_label: 'systemd_unit'
+
+    # this is for the java app
+    - job_name: java-app
+
+      static_configs:
+          - targets: [localhost]
+            labels:
+                # grafana picks up this name
+                container: wallet-app
+                # logs we gave to promtail in the compose file
+                __path__: /var/log/wallet-app.log
