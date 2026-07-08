@@ -1,0 +1,35 @@
+# This sets up Tempo to receive tracing data via OpenTelemetry protocol
+
+# Configures the internal operation web server for Tempo
+server:
+  # The port used for Tempo's API and dashboard troubleshooting
+  http_listen_port: 3200
+
+multitenancy_enabled: false
+
+# The Distributor is the entry point for traces entering Tempo
+distributor:
+  receivers:
+    # OpenTelemetry Protocol (the industry standard for tracing)
+    otlp:
+      protocols:
+        # Enables trace ingestion over HTTP (default port 4318)
+        http:
+        # Enables trace ingestion over high-performance gRPC (default port 4317)
+        # gRPC stands for Google Remote Procedure Call. It is a high-performance,
+        # open-source framework developed by Google to help different applications
+        # (or microservices) talk to each other. Instead of text, gRPC translates data
+        # into a compact binary format. Because tracing tools like Tempo have to process
+        # millions of tiny data packets every second from your applications, gRPC (port 4317)
+        # is preferred over HTTP (port 4318) because it uses drastically less CPU
+        # and network bandwidth.
+        grpc:
+
+# Defines where the actual trace data is stored
+storage:
+  trace:
+    # Uses the container's local file system instead of cloud storage like AWS S3
+    backend: local
+    local:
+      # The internal directory where Tempo writes the trace files
+      path: /var/tempo/blocks
