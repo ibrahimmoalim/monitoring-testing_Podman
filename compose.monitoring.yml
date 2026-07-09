@@ -94,7 +94,6 @@ services:
       - ./tempo-config.yml:/etc/tempo.yaml:Z
       # persistent storage
       - tempo_data:/var/tempo:Z
-
     # boot Tempo using the custom config
     # the grafana/tempo image explicitly expects the cleaner Exec Form (Array)
     # to ensure it never drops traces during a reboot.
@@ -103,7 +102,7 @@ services:
       # the '127.0.0.1' Explicitly binds port 4318 to the host's localhost
       # Tempo's web API port (Grafana uses this to fetch and display traces)
       - "127.0.0.1:3200:3200"
-      # OTLP gRPC ingest (Your Spring Boot app can send traces here)
+      # OTLP gRPC ingest (Spring Boot app can send traces here)
       - "127.0.0.1:4317:4317"
       # OTLP HTTP ingest port. Alternative endpoint for apps utilizing HTTP-based tracing.
       - "127.0.0.1:4318:4318"
