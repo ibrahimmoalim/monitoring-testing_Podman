@@ -18,8 +18,10 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
-      - '--web.external-url=http://localhost:9090/'
+      - '--web.external-url=http://localhost:9091/'
       - '--web.enable-remote-write-receiver'
+      # tell prometheus to process native histograms data
+      - '--enable-feature=native-histograms'
       # Memory diet adjustments for 2GB limit
       - '--storage.tsdb.max-block-duration=2h'
       - '--storage.tsdb.min-block-duration=2h'
