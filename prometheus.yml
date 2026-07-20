@@ -35,10 +35,13 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-        - http://grafana:3000            # Probes Grafana locally inside the Pod
+        # Probes Grafana locally inside the Pod
+        - http://grafana:3000
         # External Public or reachable targets
         - https://ibrahimmoalim.dev
         - https://api.ibrahimmoalim.dev
+        - https://api.ibrahimmoalim.dev/compliments
+        - https://projects.ibrahimmoalim.dev/ipv4_conversion_tool/
         # Internal App Endpoint on Host
         - http://host.containers.internal:8081/api/users
     relabel_configs:
