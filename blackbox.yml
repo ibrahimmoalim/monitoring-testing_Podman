@@ -11,3 +11,8 @@ modules:
       method: GET
       # allows redirects like from http to https
       follow_redirects: true
+      # this fixes 'network unreachable' errors, because blackbox
+      # tries to connect via IPv6 first if it's available, and if
+      # the internal podman network doesn't have IPv6 rounting configured,
+      # we get a 'network unreachable'
+      preferred_ip_protocol: "ip4"
