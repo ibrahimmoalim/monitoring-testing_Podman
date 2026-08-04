@@ -13,7 +13,7 @@ services:
       - ./alerts.yml:/etc/prometheus/node_alerts.yml:Z
       - prometheus_data:/prometheus:Z
     ports:
-      - "127.0.0.1:9091:9090"
+      - "9091:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -34,7 +34,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana:Z
     environment:
