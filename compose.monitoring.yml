@@ -103,13 +103,13 @@ services:
     # to ensure it never drops traces during a reboot.
     command: [ "--config.file=/etc/tempo.yaml" ]
     ports:
-      # the '127.0.0.1' Explicitly binds port 4318 to the host's localhost
-      # Tempo's web API port (Grafana uses this to fetch and display traces)
+      # security best practice to bind to loopback, both grafana
+      # and tempo can talk to eachother since they are on same network
       - "127.0.0.1:3200:3200"
       # OTLP gRPC ingest (Spring Boot app can send traces here)
-      - "127.0.0.1:4317:4317"
+      - "0.0.0.0:4317:4317"
       # OTLP HTTP ingest port. Alternative endpoint for apps utilizing HTTP-based tracing.
-      - "127.0.0.1:4318:4318"
+      - "0.0.0.0:4318:4318"
     restart: unless-stopped
     networks:
       - monitoring-testing

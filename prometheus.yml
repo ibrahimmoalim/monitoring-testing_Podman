@@ -34,7 +34,7 @@ scrape_configs:
       # make sure that server has firewall to port 8084 added
       # and http service added
       - targets:
-        - 192.168.122.175:8084
+        - 192.168.122.123:8084
         labels:
           env: staging
 
